@@ -1,9 +1,12 @@
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { getCoverUrl } from "../api/openLibrary";
 import { usePreviouslyViewed } from "../context/PreviouslyViewedContext";
+import { prefetchBookDetails } from "../hooks/prefetchBookDetails";
 
 function PreviouslyViewed() {
 	const { books } = usePreviouslyViewed();
+	const queryClient = useQueryClient();
 
 	return (
 		<section className="mt-12">
@@ -20,28 +23,41 @@ function PreviouslyViewed() {
 			</div>
 
 			<div className="flex gap-3 overflow-x-auto py-2">
-				{books.map((book) => (
-					<Link
-						key={book.key}
-						className="min-w-45 max-w-125 flex gap-2 p-2 rounded-lg border border-border bg-surface-card hover:bg-surface-elevated"
-						to={`/books/${book.key.split("/").pop()}`}
-					>
-						{book.cover_i && (
-							<img
-								src={getCoverUrl(book.cover_i)}
-								className="w-10 h-14 object-cover rounded"
-							/>
-						)}
-						<div className="flex flex-col justify-center">
-							<p className="text-xs font-medium line-clamp-2">
-								{book.title}
-							</p>
-							<p className="text-[10px] text-text-secondary line-clamp-1">
-								{book.author_name?.join(", ")}
-							</p>
-						</div>
-					</Link>
-				))}
+				{books.map((book) => {
+					const id = book.key.split("/").pop() ?? "";
+					const prefetch = () => {
+						if (id) prefetchBookDetails(queryClient, id);
+					};
+
+					return (
+						<Link
+							key={book.key}
+							className="min-w-45 max-w-125 flex gap-2 p-2 rounded-lg border border-border bg-surface-card hover:bg-surface-elevated"
+							to={`/books/${id}`}
+							state={{ preview: book }}
+							onMouseEnter={prefetch}
+							onFocus={prefetch}
+							onTouchStart={prefetch}
+						>
+							{book.cover_i && (
+								<img
+									src={getCoverUrl(book.cover_i)}
+									loading="lazy"
+									decoding="async"
+									className="w-10 h-14 object-cover rounded"
+								/>
+							)}
+							<div className="flex flex-col justify-center">
+								<p className="text-xs font-medium line-clamp-2">
+									{book.title}
+								</p>
+								<p className="text-[10px] text-text-secondary line-clamp-1">
+									{book.author_name?.join(", ")}
+								</p>
+							</div>
+						</Link>
+					);
+				})}
 			</div>
 
 			{books.length === 0 && (

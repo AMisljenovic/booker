@@ -1,9 +1,13 @@
 import { useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getCoverUrl } from "../api/openLibrary";
 import { usePreviouslyViewed } from "../context/PreviouslyViewedContext";
 import { useBookDetails } from "../hooks/useBookDetails";
-import Loader from "../components/ui/Loader";
+import Skeleton from "../components/ui/Skeleton";
+import TopProgress from "../components/ui/TopProgress";
+import type { BookSearchResult, PreviousBook } from "../types/books";
+
+type PreviewBook = BookSearchResult | PreviousBook;
 
 function BackToHome({ onClick }: { onClick: () => void }) {
 	return (
@@ -42,11 +46,95 @@ function BookDetailsMessage({
 	);
 }
 
+function CoverBlock({ coverId, title }: { coverId?: number; title: string }) {
+	return (
+		<div className="shrink-0">
+			{coverId ? (
+				<img
+					src={getCoverUrl(coverId)}
+					alt={title}
+					decoding="async"
+					className="h-105 w-70 rounded-xl border border-border object-cover shadow-lg"
+				/>
+			) : (
+				<div className="flex h-105 w-70 items-center justify-center rounded-xl border border-border bg-surface-card text-text-secondary">
+					No cover available
+				</div>
+			)}
+		</div>
+	);
+}
+
+function BookDetailsBodySkeleton() {
+	return (
+		<div className="space-y-3">
+			<Skeleton className="h-4 w-full" />
+			<Skeleton className="h-4 w-11/12" />
+			<Skeleton className="h-4 w-10/12" />
+			<Skeleton className="h-4 w-9/12" />
+			<Skeleton className="h-4 w-1/2" />
+		</div>
+	);
+}
+
+function BookDetailsSkeleton({ preview }: { preview?: PreviewBook }) {
+	return (
+		<div className="mt-8 flex flex-col gap-8 lg:flex-row">
+			{preview ? (
+				<CoverBlock coverId={preview.cover_i} title={preview.title} />
+			) : (
+				<Skeleton className="h-105 w-70 rounded-xl" />
+			)}
+
+			<div className="flex max-w-3xl flex-col gap-6 flex-1">
+				<div>
+					{preview ? (
+						<h1 className="text-3xl font-bold leading-tight">
+							{preview.title}
+						</h1>
+					) : (
+						<Skeleton className="h-8 w-2/3" />
+					)}
+
+					<div className="mt-4 flex flex-wrap items-center gap-2">
+						{preview?.author_name?.length
+							? preview.author_name.map((author) => (
+									<div
+										key={author}
+										className="rounded-full border border-border bg-surface-card px-3 py-1 text-sm text-text-secondary"
+									>
+										{author}
+									</div>
+								))
+							: (
+								<>
+									<Skeleton className="h-6 w-24 rounded-full" />
+									<Skeleton className="h-6 w-32 rounded-full" />
+								</>
+							)}
+					</div>
+				</div>
+
+				<div className="flex flex-wrap gap-3">
+					<Skeleton className="h-6 w-40 rounded-full" />
+					<Skeleton className="h-6 w-32 rounded-full" />
+				</div>
+
+				<BookDetailsBodySkeleton />
+			</div>
+		</div>
+	);
+}
+
 function BookDetails() {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { addBook } = usePreviouslyViewed();
 	const { id } = useParams<{ id: string }>();
 	const { data, isLoading, isError, error } = useBookDetails(id);
+
+	const preview = (location.state as { preview?: PreviewBook } | null)
+		?.preview;
 
 	const goHome = () => navigate("/");
 
@@ -79,7 +167,13 @@ function BookDetails() {
 	}
 
 	if (isLoading) {
-		return <Loader />;
+		return (
+			<>
+				<TopProgress visible />
+				<BackToHome onClick={goHome} />
+				<BookDetailsSkeleton preview={preview} />
+			</>
+		);
 	}
 
 	if (isError) {
@@ -107,7 +201,7 @@ function BookDetails() {
 	}
 
 	const { work, authorNames, edition } = data;
-	const coverId = work.covers?.[0];
+	const coverId = work.covers?.[0] ?? preview?.cover_i;
 	const isbn = edition?.isbn_13?.[0] ?? edition?.isbn_10?.[0];
 	const publisher = edition?.publishers?.[0];
 	const description =
@@ -120,19 +214,7 @@ function BookDetails() {
 			<BackToHome onClick={goHome} />
 
 			<div className="mt-8 flex flex-col gap-8 lg:flex-row">
-				<div className="shrink-0">
-					{coverId ? (
-						<img
-							src={getCoverUrl(coverId)}
-							alt={work.title}
-							className="h-105 w-70 rounded-xl border border-border object-cover shadow-lg"
-						/>
-					) : (
-						<div className="flex h-105 w-70 items-center justify-center rounded-xl border border-border bg-surface-card text-text-secondary">
-							No cover available
-						</div>
-					)}
-				</div>
+				<CoverBlock coverId={coverId} title={work.title} />
 
 				<div className="flex max-w-3xl flex-col gap-6">
 					<div>

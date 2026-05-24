@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import PreviouslyViewed from "../components/PreviouslyViewed";
 import Results from "../components/Results";
+import ResultsSkeleton from "../components/ResultsSkeleton";
 import Search from "../components/Search";
 import { BOOKS_PER_PAGE } from "../api/openLibrary";
 import Pagination from "../components/Pagination";
-import Loader from "../components/ui/Loader";
+import TopProgress from "../components/ui/TopProgress";
 import { useBookSearch } from "../hooks/useBookSearch";
+import { prefetchBookSearch } from "../hooks/prefetchBookSearch";
 
 function setSearchParamsForQuery(
 	setSearchParams: ReturnType<typeof useSearchParams>[1],
@@ -25,6 +28,7 @@ function setSearchParamsForQuery(
 
 function Home() {
 	const [searchParams, setSearchParams] = useSearchParams();
+	const queryClient = useQueryClient();
 	const q = searchParams.get("q")?.trim() ?? "";
 	const page = Math.max(
 		1,
@@ -37,10 +41,20 @@ function Home() {
 	const books = hasSearch ? (data?.docs ?? []) : [];
 	const totalCount = hasSearch ? (data?.numFound ?? 0) : 0;
 	const totalPages = Math.ceil(totalCount / BOOKS_PER_PAGE);
+	const isInitialLoading = hasSearch && isFetching && !data;
+	const isRefetching = hasSearch && isFetching && Boolean(data);
 
 	useEffect(() => {
 		setQuery(q);
 	}, [q]);
+
+	// Background-prefetch next page to mask click latency.
+	useEffect(() => {
+		if (!hasSearch || !data) return;
+		if (page < totalPages) {
+			prefetchBookSearch(queryClient, q, page + 1);
+		}
+	}, [hasSearch, data, page, totalPages, q, queryClient]);
 
 	const handleSearch = (value: string) => {
 		const trimmed = value.trim();
@@ -59,6 +73,11 @@ function Home() {
 		});
 	};
 
+	const handlePagePrefetch = (newPage: number) => {
+		if (newPage < 1 || newPage > totalPages) return;
+		prefetchBookSearch(queryClient, q, newPage);
+	};
+
 	const handleClear = () => {
 		setSearchParams({});
 		setQuery("");
@@ -66,6 +85,8 @@ function Home() {
 
 	return (
 		<div className="flex flex-col">
+			<TopProgress visible={isRefetching} />
+
 			<Search
 				query={query}
 				setQuery={setQuery}
@@ -73,15 +94,15 @@ function Home() {
 				onClear={handleClear}
 			/>
 
-			{hasSearch && isFetching && <Loader />}
+			{isInitialLoading && <ResultsSkeleton />}
 
-			{hasSearch && isError && (
+			{hasSearch && isError && !data && (
 				<p className="mt-4 text-red-600" role="alert">
 					{error instanceof Error ? error.message : "Search failed"}
 				</p>
 			)}
 
-			{hasSearch && !isFetching && !isError && books.length > 0 && (
+			{hasSearch && !isInitialLoading && books.length > 0 && (
 				<>
 					<Results books={books} totalCount={totalCount} />
 
@@ -91,6 +112,7 @@ function Home() {
 								currentPage={page}
 								totalPages={totalPages}
 								onPageChange={handlePageChange}
+								onPagePrefetch={handlePagePrefetch}
 							/>
 						</div>
 					)}

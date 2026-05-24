@@ -2,6 +2,7 @@ interface PaginationProps {
 	currentPage: number;
 	totalPages: number;
 	onPageChange: (value: number) => void;
+	onPagePrefetch?: (value: number) => void;
 }
 
 type PaginationItem = number | "ellipsis";
@@ -45,13 +46,21 @@ function getPaginationItems(
 }
 
 function Pagination(props: PaginationProps) {
-	const { currentPage, totalPages, onPageChange } = props;
+	const { currentPage, totalPages, onPageChange, onPagePrefetch } = props;
 
 	if (totalPages <= 1) {
 		return null;
 	}
 
 	const pages = getPaginationItems(currentPage, totalPages);
+	const prefetchHandlers = (page: number) =>
+		onPagePrefetch
+			? {
+					onMouseEnter: () => onPagePrefetch(page),
+					onFocus: () => onPagePrefetch(page),
+					onTouchStart: () => onPagePrefetch(page),
+				}
+			: {};
 
 	return (
 		<div className="flex items-center gap-2">
@@ -59,6 +68,7 @@ function Pagination(props: PaginationProps) {
 				type="button"
 				onClick={() => onPageChange(currentPage - 1)}
 				disabled={currentPage === 1}
+				{...prefetchHandlers(currentPage - 1)}
 				className="rounded border px-3 py-1 disabled:opacity-50 cursor-pointer"
 			>
 				Prev
@@ -79,6 +89,7 @@ function Pagination(props: PaginationProps) {
 						key={page}
 						onClick={() => onPageChange(page)}
 						aria-current={currentPage === page ? "page" : undefined}
+						{...prefetchHandlers(page)}
 						className={`min-w-9 rounded border px-3 py-1 cursor-pointer ${
 							currentPage === page
 								? "bg-black text-white border-black"
@@ -94,6 +105,7 @@ function Pagination(props: PaginationProps) {
 				type="button"
 				onClick={() => onPageChange(currentPage + 1)}
 				disabled={currentPage === totalPages}
+				{...prefetchHandlers(currentPage + 1)}
 				className="rounded border px-3 py-1 disabled:opacity-50 cursor-pointer"
 			>
 				Next

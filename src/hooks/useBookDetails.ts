@@ -12,10 +12,12 @@ export interface BookDetailsData {
 	edition: Awaited<ReturnType<typeof getBookEditions>>;
 }
 
-async function fetchBookDetails(id: string): Promise<BookDetailsData> {
+export async function fetchBookDetails(id: string): Promise<BookDetailsData> {
 	const work = await getBook(id);
-	const authorNames = work.authors ? await getAuthorNames(work.authors) : [];
-	const edition = await getBookEditions(work.key);
+	const [authorNames, edition] = await Promise.all([
+		work.authors ? getAuthorNames(work.authors) : Promise.resolve([]),
+		getBookEditions(work.key),
+	]);
 
 	return { work, authorNames, edition };
 }
